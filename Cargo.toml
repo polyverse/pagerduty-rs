@@ -12,6 +12,7 @@ serde = "1.0.117"
 serde_json = "1.0.59"
 url = "2.2.0"
 ureq = "1.5.2"
+rand = "0.7.3"
 
 [dev-dependencies]
 assert_matches = "1.4.0"
