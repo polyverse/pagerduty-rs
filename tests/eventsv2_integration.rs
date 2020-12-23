@@ -1,7 +1,7 @@
-use chrono::{TimeZone, Utc};
 use pagerduty_rs::eventsv2::*;
 use rand::{thread_rng, Rng};
 use serde::Serialize;
+use time::OffsetDateTime;
 
 /// Set with some integration key value before running tests that post directly to service
 const INTEGRATION_KEY: Option<&str> = None;
@@ -19,7 +19,7 @@ fn post_change_maximum() {
             payload: ChangePayload {
                 summary: "Change Event 1 maximum fields".to_owned(),
                 source: Some("hostname".to_owned()),
-                timestamp: Utc::now(),
+                timestamp: OffsetDateTime::now_utc(),
                 custom_details: Some(SerializableTest {
                     some_field: "Serialize this!".to_owned(),
                     another_field: 34,
@@ -45,7 +45,7 @@ fn post_change_minimum() {
         let e = Event::Change(Change::<()> {
             payload: ChangePayload {
                 summary: "Change event 2 minimum fields (routing key in api client)".to_owned(),
-                timestamp: Utc::now(),
+                timestamp: OffsetDateTime::now_utc(),
                 source: None,
                 custom_details: None,
             },
@@ -63,19 +63,15 @@ fn post_change_minimum() {
 fn post_alert_maximum_trigger_acknowledge_resolve() {
     if let Some(ik) = INTEGRATION_KEY {
         let mut rng = thread_rng();
-        let dedup_key = format!("TestDeDupKey{}", rng.gen_range(0, 100));
+        let dedup_key = format!("TestDeDupKey{}", rng.gen_range(0..100));
 
-        let ev2 = EventsV2::new(
-            ik.to_owned(),
-            Some("pagerduty-rs test".to_owned()),
-        )
-        .unwrap();
+        let ev2 = EventsV2::new(ik.to_owned(), Some("pagerduty-rs test".to_owned())).unwrap();
         // With everything
         let e = Event::AlertTrigger(AlertTrigger {
             payload: AlertTriggerPayload {
                 summary: "Test Alert 1 Maximum fields".to_owned(),
                 source: "hostname".to_owned(),
-                timestamp: Some(Utc::now()),
+                timestamp: Some(OffsetDateTime::now_utc()),
                 severity: Severity::Info,
                 component: Some("postgres".to_owned()),
                 group: Some("prod-datapipe".to_owned()),
@@ -102,15 +98,13 @@ fn post_alert_maximum_trigger_acknowledge_resolve() {
         let result = ev2.event(e);
         assert!(result.is_ok());
 
-        let e = Event::AlertAcknowledge::<()>(AlertAcknowledge{
+        let e = Event::AlertAcknowledge::<()>(AlertAcknowledge {
             dedup_key: dedup_key.clone(),
         });
         let result = ev2.event(e);
         assert!(result.is_ok());
 
-        let e = Event::AlertResolve::<()>(AlertResolve{
-            dedup_key: dedup_key.clone(),
-        });
+        let e = Event::AlertResolve::<()>(AlertResolve { dedup_key });
         let result = ev2.event(e);
         assert!(result.is_ok());
     }
@@ -120,13 +114,9 @@ fn post_alert_maximum_trigger_acknowledge_resolve() {
 fn post_alert_minimum_trigger_acknowledge_resolve() {
     if let Some(ik) = INTEGRATION_KEY {
         let mut rng = thread_rng();
-        let dedup_key = format!("TestDeDupKey{}", rng.gen_range(0, 100));
+        let dedup_key = format!("TestDeDupKey{}", rng.gen_range(0..100));
 
-        let ev2 = EventsV2::new(
-            ik.to_owned(),
-            None,
-        )
-        .unwrap();
+        let ev2 = EventsV2::new(ik.to_owned(), None).unwrap();
         // With everything
         let e = Event::AlertTrigger::<()>(AlertTrigger {
             payload: AlertTriggerPayload {
@@ -149,15 +139,13 @@ fn post_alert_minimum_trigger_acknowledge_resolve() {
         let result = ev2.event(e);
         assert!(result.is_ok());
 
-        let e = Event::AlertAcknowledge::<()>(AlertAcknowledge{
+        let e = Event::AlertAcknowledge::<()>(AlertAcknowledge {
             dedup_key: dedup_key.clone(),
         });
         let result = ev2.event(e);
         assert!(result.is_ok());
 
-        let e = Event::AlertResolve::<()>(AlertResolve{
-            dedup_key: dedup_key.clone(),
-        });
+        let e = Event::AlertResolve::<()>(AlertResolve { dedup_key });
         let result = ev2.event(e);
         assert!(result.is_ok());
     }

@@ -1,9 +1,10 @@
-use chrono::{DateTime, Utc};
 use serde::Serialize;
+use serde::Serializer;
 use std::convert::From;
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::time::Duration;
+use time::OffsetDateTime;
 
 const CONTENT_TYPE: &str = "content-type";
 const USER_AGENT: &str = "user-agent";
@@ -86,7 +87,8 @@ pub struct ChangePayload<T: Serialize> {
     pub summary: String,
 
     /// The time at which the emitting tool detected or generated the event.
-    pub timestamp: DateTime<Utc>,
+    #[serde(serialize_with = "datetime_to_iso8601")]
+    pub timestamp: OffsetDateTime,
 
     /// The unique name of the location where the Change Event occurred.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -123,7 +125,8 @@ pub struct AlertTriggerPayload<T: Serialize> {
 
     /// The time at which the emitting tool detected or generated the event.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub timestamp: Option<DateTime<Utc>>,
+    #[serde(serialize_with = "optional_datetime_to_iso8601")]
+    pub timestamp: Option<OffsetDateTime>,
 
     /// Component of the source machine that is responsible for the event, for example mysql or eth0
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -239,6 +242,27 @@ struct SendableAlertFollowup {
     routing_key: String,
     dedup_key: String,
     event_action: Action,
+}
+
+fn optional_datetime_to_iso8601<S>(
+    od: &Option<OffsetDateTime>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match od.as_ref() {
+        Some(d) => datetime_to_iso8601(d, serializer),
+        None => serializer.serialize_none(),
+    }
+}
+
+fn datetime_to_iso8601<S>(d: &OffsetDateTime, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    //serializer.serialize_str(d.format(Format::Rfc3339).as_str())
+    serializer.serialize_str(d.format("%FT%T.%NZ").as_str())
 }
 
 #[derive(Debug)]
@@ -390,7 +414,6 @@ impl EventsV2 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
     use pretty_assertions::assert_eq;
 
     #[derive(Serialize)]
@@ -406,7 +429,7 @@ mod tests {
             payload: ChangePayload {
                 summary: "Hello".to_owned(),
                 source: Some("hostname".to_owned()),
-                timestamp: Utc.timestamp_millis(2000071804323),
+                timestamp: OffsetDateTime::from_unix_timestamp_nanos(2000071804323000000),
                 custom_details: Some(SerializableTest {
                     some_field: "Serialize this!".to_owned(),
                     another_field: 34,
@@ -420,13 +443,13 @@ mod tests {
 
         let cr = serde_json::to_string(&c);
         assert!(cr.is_ok());
-        assert_eq!(cr.unwrap(), "{\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323Z\",\"source\":\"hostname\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}]}");
+        assert_eq!(cr.unwrap(), "{\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323000000Z\",\"source\":\"hostname\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}]}");
 
         // With nothing optional
         let c = Change::<()> {
             payload: ChangePayload {
                 summary: "Hello".to_owned(),
-                timestamp: Utc.timestamp_millis(2000071804323),
+                timestamp: OffsetDateTime::from_unix_timestamp_nanos(2000071804323000000),
                 source: None,
                 custom_details: None,
             },
@@ -437,7 +460,7 @@ mod tests {
         assert!(cr.is_ok());
         assert_eq!(
             cr.unwrap(),
-            "{\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323Z\"}}"
+            "{\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323000000Z\"}}"
         );
     }
 
@@ -449,7 +472,7 @@ mod tests {
             payload: ChangePayload {
                 summary: "Hello".to_owned(),
                 source: Some("hostname".to_owned()),
-                timestamp: Utc.timestamp_millis(2000071804323),
+                timestamp: OffsetDateTime::from_unix_timestamp_nanos(2000071804323000000),
                 custom_details: Some(SerializableTest {
                     some_field: "Serialize this!".to_owned(),
                     another_field: 34,
@@ -463,14 +486,14 @@ mod tests {
 
         let cr = serde_json::to_string(&c);
         assert!(cr.is_ok());
-        assert_eq!(cr.unwrap(), "{\"routing_key\":\"routingkey\",\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323Z\",\"source\":\"hostname\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}]}");
+        assert_eq!(cr.unwrap(), "{\"routing_key\":\"routingkey\",\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323000000Z\",\"source\":\"hostname\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}]}");
 
         // With nothing optional
         let c = SendableChange::<()> {
             routing_key: "routingkey".to_owned(),
             payload: ChangePayload {
                 summary: "Hello".to_owned(),
-                timestamp: Utc.timestamp_millis(2000071804323),
+                timestamp: OffsetDateTime::from_unix_timestamp_nanos(2000071804323000000),
                 source: None,
                 custom_details: None,
             },
@@ -479,7 +502,7 @@ mod tests {
 
         let cr = serde_json::to_string(&c);
         assert!(cr.is_ok());
-        assert_eq!(cr.unwrap(), "{\"routing_key\":\"routingkey\",\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323Z\"}}");
+        assert_eq!(cr.unwrap(), "{\"routing_key\":\"routingkey\",\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323000000Z\"}}");
     }
 
     #[test]
@@ -489,7 +512,9 @@ mod tests {
             payload: AlertTriggerPayload {
                 summary: "Hello".to_owned(),
                 source: "hostname".to_owned(),
-                timestamp: Some(Utc.timestamp_millis(2000071804323)),
+                timestamp: Some(OffsetDateTime::from_unix_timestamp_nanos(
+                    2000071804323000000,
+                )),
                 severity: Severity::Info,
                 component: Some("postgres".to_owned()),
                 group: Some("prod-datapipe".to_owned()),
@@ -515,7 +540,7 @@ mod tests {
 
         let ar = serde_json::to_string(&a);
         assert!(ar.is_ok());
-        assert_eq!(ar.unwrap(), "{\"payload\":{\"severity\":\"info\",\"summary\":\"Hello\",\"source\":\"hostname\",\"timestamp\":\"2033-05-18T23:30:04.323Z\",\"component\":\"postgres\",\"group\":\"prod-datapipe\",\"class\":\"deploy\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"dedup_key\":\"dedupkey1\",\"images\":[{\"src\":\"https://polyverse.com/static/img/SplashPageIMG/polyverse_blue.png\",\"href\":\"https://polyverse.com\",\"alt\":\"The Polyverse Logo\"}],\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}],\"client\":\"Zerotect\",\"client_url\":\"https://github.com/polyverse/zerotect\"}");
+        assert_eq!(ar.unwrap(), "{\"payload\":{\"severity\":\"info\",\"summary\":\"Hello\",\"source\":\"hostname\",\"timestamp\":\"2033-05-18T23:30:04.323000000Z\",\"component\":\"postgres\",\"group\":\"prod-datapipe\",\"class\":\"deploy\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"dedup_key\":\"dedupkey1\",\"images\":[{\"src\":\"https://polyverse.com/static/img/SplashPageIMG/polyverse_blue.png\",\"href\":\"https://polyverse.com\",\"alt\":\"The Polyverse Logo\"}],\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}],\"client\":\"Zerotect\",\"client_url\":\"https://github.com/polyverse/zerotect\"}");
 
         // With nothing optional
         let a = AlertTrigger::<()> {
@@ -553,7 +578,9 @@ mod tests {
             payload: AlertTriggerPayload {
                 summary: "Hello".to_owned(),
                 source: "hostname".to_owned(),
-                timestamp: Some(Utc.timestamp_millis(2000071804323)),
+                timestamp: Some(OffsetDateTime::from_unix_timestamp_nanos(
+                    2000071804323000000,
+                )),
                 severity: Severity::Info,
                 component: Some("postgres".to_owned()),
                 group: Some("prod-datapipe".to_owned()),
@@ -579,7 +606,7 @@ mod tests {
 
         let ar = serde_json::to_string(&a);
         assert!(ar.is_ok());
-        assert_eq!(ar.unwrap(), "{\"routing_key\":\"routingkey\",\"payload\":{\"severity\":\"info\",\"summary\":\"Hello\",\"source\":\"hostname\",\"timestamp\":\"2033-05-18T23:30:04.323Z\",\"component\":\"postgres\",\"group\":\"prod-datapipe\",\"class\":\"deploy\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"dedup_key\":\"dedupkey1\",\"images\":[{\"src\":\"https://polyverse.com/static/img/SplashPageIMG/polyverse_blue.png\",\"href\":\"https://polyverse.com\",\"alt\":\"The Polyverse Logo\"}],\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}],\"event_action\":\"trigger\",\"client\":\"Zerotect\",\"client_url\":\"https://github.com/polyverse/zerotect\"}");
+        assert_eq!(ar.unwrap(), "{\"routing_key\":\"routingkey\",\"payload\":{\"severity\":\"info\",\"summary\":\"Hello\",\"source\":\"hostname\",\"timestamp\":\"2033-05-18T23:30:04.323000000Z\",\"component\":\"postgres\",\"group\":\"prod-datapipe\",\"class\":\"deploy\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"dedup_key\":\"dedupkey1\",\"images\":[{\"src\":\"https://polyverse.com/static/img/SplashPageIMG/polyverse_blue.png\",\"href\":\"https://polyverse.com\",\"alt\":\"The Polyverse Logo\"}],\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}],\"event_action\":\"trigger\",\"client\":\"Zerotect\",\"client_url\":\"https://github.com/polyverse/zerotect\"}");
 
         // With nothing optional
         let a = SendableAlertTrigger::<()> {
