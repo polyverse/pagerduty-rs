@@ -1,11 +1,12 @@
+use crate::private_types::*;
 use crate::types::*;
 
-use serde::{Serialize, Serializer};
+use hyper::{client::HttpConnector, Body, Client, Request};
+use hyper_tls::HttpsConnector;
+use serde::Serialize;
 use std::convert::From;
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
-use std::time::Duration;
-use time::OffsetDateTime;
 
 const CONTENT_TYPE: &str = "content-type";
 const USER_AGENT: &str = "user-agent";
@@ -17,16 +18,11 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 #[derive(Debug)]
 pub enum EventsV2Error {
     SerdeJsonError(serde_json::Error),
-
-    /// A synthetic error from ureq library (basically not an HTTP error of any kind.)
-    SyntheticUreqError(Option<ureq::Error>),
-
-    /// Any Http Error
-    HttpError(u16),
-
-    /// We expected PagerDuty to respond with 202 Accepted - this indicates we got anything but 202
-    /// could be 1xx or 3xx codes as well.
-    NotAccepted(u16),
+    HyperError(hyper::Error),
+    HyperHttpError(hyper::http::Error),
+    //https://developer.pagerduty.com/docs/events-api-v2/overview/#api-response-codes--retry-logic
+    HttpNotAccepted(u16), // NOT 4xx, 5xx or 200 (we expect 202). Contains HTTP response code.
+    HttpError(u16),       // A legit error (4xx or 5xx). Contains HTTP response code.
 }
 
 impl Error for EventsV2Error {}
@@ -34,20 +30,26 @@ impl Display for EventsV2Error {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         match self {
             Self::SerdeJsonError(e) => write!(f, "SerdeJsonError: {}", e),
-            Self::SyntheticUreqError(oe) => match oe {
-                Some(e) => write!(f, "SyntheticUreqError: {}", e),
-                None => write!(f, "SyntheticUreqError (no details)"),
-            },
-            Self::HttpError(c) => write!(f, "HttpError with Status Code {}", c),
-            Self::NotAccepted(c) => {
-                write!(f, "Http Status Code was other than 202 (Accepted): {}", c)
-            }
+            Self::HyperHttpError(e) => write!(f, "HyperHttpError: {}", e),
+            Self::HyperError(e) => write!(f, "HyperError: {}", e),
+            Self::HttpNotAccepted(e) => write!(f, "HttpNotAccepted: {}", e),
+            Self::HttpError(e) => write!(f, "HttpError: {}", e),
         }
     }
 }
 impl From<serde_json::Error> for EventsV2Error {
     fn from(err: serde_json::Error) -> Self {
         Self::SerdeJsonError(err)
+    }
+}
+impl From<hyper::http::Error> for EventsV2Error {
+    fn from(err: hyper::http::Error) -> Self {
+        Self::HyperHttpError(err)
+    }
+}
+impl From<hyper::Error> for EventsV2Error {
+    fn from(err: hyper::Error) -> Self {
+        Self::HyperError(err)
     }
 }
 
@@ -57,6 +59,7 @@ pub type EventsV2Result = Result<(), EventsV2Error>;
 pub struct EventsV2 {
     /// The integration/routing key for a generated PagerDuty service
     integration_key: String,
+    client: Client<HttpsConnector<HttpConnector>>,
     user_agent: Option<String>,
 }
 
@@ -65,98 +68,83 @@ impl EventsV2 {
         integration_key: String,
         user_agent: Option<String>,
     ) -> Result<EventsV2, EventsV2Error> {
+        let https = HttpsConnector::new();
+
         Ok(EventsV2 {
             integration_key,
             user_agent,
+            client: Client::builder().build::<_, hyper::Body>(https),
         })
     }
 
-    pub fn event<T: Serialize>(&self, event: Event<T>) -> EventsV2Result {
+    pub async fn event<T: Serialize>(&self, event: Event<T>) -> EventsV2Result {
         match event {
-            Event::Change(c) => self.change(c),
-            Event::AlertTrigger(at) => self.alert_trigger(at),
-            Event::AlertAcknowledge(aa) => self.alert_followup(aa.dedup_key, Action::Acknowledge),
-            Event::AlertResolve(ar) => self.alert_followup(ar.dedup_key, Action::Resolve),
+            Event::Change(c) => self.change(c).await,
+            Event::AlertTrigger(at) => self.alert_trigger(at).await,
+            Event::AlertAcknowledge(aa) => {
+                self.alert_followup(aa.dedup_key, Action::Acknowledge).await
+            }
+            Event::AlertResolve(ar) => self.alert_followup(ar.dedup_key, Action::Resolve).await,
         }
     }
 
-    fn change<T: Serialize>(&self, change: Change<T>) -> EventsV2Result {
-        let sendable_change = SendableChange {
-            routing_key: self.integration_key.clone(),
-            links: change.links,
-            payload: change.payload,
-        };
+    async fn change<T: Serialize>(&self, change: Change<T>) -> EventsV2Result {
+        let sendable_change = SendableChange::from_change(change, self.integration_key.clone());
 
         self.do_post(
             "https://events.pagerduty.com/v2/change/enqueue",
             sendable_change,
         )
+        .await
     }
 
-    fn alert_trigger<T: Serialize>(&self, alert_trigger: AlertTrigger<T>) -> EventsV2Result {
-        let sendable_alert_trigger = SendableAlertTrigger {
-            routing_key: self.integration_key.clone(),
-            event_action: Action::Trigger,
-            dedup_key: alert_trigger.dedup_key,
-            images: alert_trigger.images,
-            links: alert_trigger.links,
-            payload: alert_trigger.payload,
-            client: alert_trigger.client,
-            client_url: alert_trigger.client_url,
-        };
+    async fn alert_trigger<T: Serialize>(&self, alert_trigger: AlertTrigger<T>) -> EventsV2Result {
+        let sendable_alert_trigger =
+            SendableAlertTrigger::from_alert_trigger(alert_trigger, self.integration_key.clone());
 
         self.do_post(
             "https://events.pagerduty.com/v2/enqueue",
             sendable_alert_trigger,
         )
+        .await
     }
 
-    fn alert_followup(&self, dedup_key: String, action: Action) -> EventsV2Result {
-        let sendable_alert_followup = SendableAlertFollowup {
-            routing_key: self.integration_key.clone(),
-            event_action: action,
-            dedup_key,
-        };
+    async fn alert_followup(&self, dedup_key: String, action: Action) -> EventsV2Result {
+        let sendable_alert_followup =
+            SendableAlertFollowup::new(dedup_key, action, self.integration_key.clone());
 
         self.do_post(
             "https://events.pagerduty.com/v2/enqueue",
             sendable_alert_followup,
         )
+        .await
     }
 
     // Make this part Async in the future
-    fn do_post<T: Serialize>(&self, url: &str, content: T) -> EventsV2Result {
+    async fn do_post<T: Serialize>(&self, url: &str, content: T) -> EventsV2Result {
         let jsonstr = serde_json::to_string(&content)?;
 
-        let mut request = ureq::post(url);
+        let mut reqbldr = Request::builder()
+            .method("POST")
+            .uri(url)
+            .header(CONTENT_TYPE, CONTENT_TYPE_JSON)
+            .header(CONTENT_ENCODING, CONTENT_ENCODING_IDENTITY);
 
-        request
-            .set(CONTENT_TYPE, CONTENT_TYPE_JSON)
-            .set(CONTENT_ENCODING, CONTENT_ENCODING_IDENTITY)
-            // 300 seconds should be plenty to post to pagerduty
-            .timeout(Duration::from_secs(300));
-
-        if let Some(ua) = &self.user_agent {
-            request.set(USER_AGENT, ua);
+        reqbldr = if let Some(ua) = &self.user_agent {
+            reqbldr.header(USER_AGENT, ua)
+        } else {
+            reqbldr
         };
 
-        let resp = request.send_string(jsonstr.as_str());
+        let req = reqbldr.body(Body::from(jsonstr))?;
 
-        if resp.synthetic() {
-            return Err(EventsV2Error::SyntheticUreqError(
-                resp.into_synthetic_error(),
-            ));
+        let res = self.client.request(req).await?;
+
+        match res.status().as_u16() {
+            202 => Ok(()),
+            e if e < 400 => Err(EventsV2Error::HttpNotAccepted(e)),
+            e => Err(EventsV2Error::HttpError(e)),
         }
-
-        if resp.error() {
-            return Err(EventsV2Error::HttpError(resp.status()));
-        }
-
-        if resp.status() != 202 {
-            return Err(EventsV2Error::NotAccepted(resp.status()));
-        }
-
-        Ok(())
     }
 }
 
@@ -164,6 +152,7 @@ impl EventsV2 {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+    use time::OffsetDateTime;
 
     #[derive(Serialize)]
     pub struct SerializableTest {

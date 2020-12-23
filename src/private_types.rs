@@ -17,6 +17,19 @@ pub struct SendableChange<T: Serialize> {
     pub links: Option<Links>,
 }
 
+impl<T> SendableChange<T>
+where
+    T: Serialize,
+{
+    pub fn from_change(change: Change<T>, integration_key: String) -> Self {
+        SendableChange::<T> {
+            routing_key: integration_key,
+            links: change.links,
+            payload: change.payload,
+        }
+    }
+}
+
 #[derive(Serialize)]
 pub struct SendableAlertTrigger<T: Serialize> {
     /// This is the 32 character Integration Key for an integration on a service or on a global ruleset.
@@ -50,9 +63,37 @@ pub struct SendableAlertTrigger<T: Serialize> {
     pub client_url: Option<String>,
 }
 
+impl<T> SendableAlertTrigger<T>
+where
+    T: Serialize,
+{
+    pub fn from_alert_trigger(alert_trigger: AlertTrigger<T>, integration_key: String) -> Self {
+        SendableAlertTrigger::<T> {
+            routing_key: integration_key,
+            event_action: Action::Trigger,
+            dedup_key: alert_trigger.dedup_key,
+            images: alert_trigger.images,
+            links: alert_trigger.links,
+            payload: alert_trigger.payload,
+            client: alert_trigger.client,
+            client_url: alert_trigger.client_url,
+        }
+    }
+}
+
 #[derive(Serialize)]
 pub struct SendableAlertFollowup {
     pub routing_key: String,
     pub dedup_key: String,
     pub event_action: Action,
+}
+
+impl SendableAlertFollowup {
+    pub fn new(dedup_key: String, action: Action, integration_key: String) -> Self {
+        SendableAlertFollowup {
+            routing_key: integration_key,
+            event_action: action,
+            dedup_key,
+        }
+    }
 }

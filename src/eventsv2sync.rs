@@ -81,11 +81,7 @@ impl EventsV2 {
     }
 
     fn change<T: Serialize>(&self, change: Change<T>) -> EventsV2Result {
-        let sendable_change = SendableChange::<T> {
-            routing_key: self.integration_key.clone(),
-            links: change.links,
-            payload: change.payload,
-        };
+        let sendable_change = SendableChange::from_change(change, self.integration_key.clone());
 
         self.do_post(
             "https://events.pagerduty.com/v2/change/enqueue",
@@ -94,16 +90,8 @@ impl EventsV2 {
     }
 
     fn alert_trigger<T: Serialize>(&self, alert_trigger: AlertTrigger<T>) -> EventsV2Result {
-        let sendable_alert_trigger = SendableAlertTrigger::<T> {
-            routing_key: self.integration_key.clone(),
-            event_action: Action::Trigger,
-            dedup_key: alert_trigger.dedup_key,
-            images: alert_trigger.images,
-            links: alert_trigger.links,
-            payload: alert_trigger.payload,
-            client: alert_trigger.client,
-            client_url: alert_trigger.client_url,
-        };
+        let sendable_alert_trigger =
+            SendableAlertTrigger::from_alert_trigger(alert_trigger, self.integration_key.clone());
 
         self.do_post(
             "https://events.pagerduty.com/v2/enqueue",
@@ -112,11 +100,8 @@ impl EventsV2 {
     }
 
     fn alert_followup(&self, dedup_key: String, action: Action) -> EventsV2Result {
-        let sendable_alert_followup = SendableAlertFollowup {
-            routing_key: self.integration_key.clone(),
-            event_action: action,
-            dedup_key,
-        };
+        let sendable_alert_followup =
+            SendableAlertFollowup::new(dedup_key, action, self.integration_key.clone());
 
         self.do_post(
             "https://events.pagerduty.com/v2/enqueue",
