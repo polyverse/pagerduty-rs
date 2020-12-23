@@ -12,16 +12,25 @@ repository = "https://github.com/polyverse/pagerduty-rs"
 description = """PagerDuty API from Rust."""
 
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = ["ureq"]
+async = ["futures", "futures-util", "tokio"]
 
 [dependencies]
-chrono = { version = "0.4.19", features = ["serde"]}
-serde = "1.0.117"
-serde_json = "1.0.59"
+serde = "1.0.118"
+serde_json = "1.0.60"
 url = "2.2.0"
-ureq = "1.5.2"
 rand = "0.8.0"
 time = {version = "0.2.23", features = ["std", "serde"]}
+
+# Optional - Only when using sync
+ureq = {version = "1.5.4", optional = true}
+
+# Optional - only enabled through the "async" feature
+futures = { version = "0.3.8", optional = true }
+futures-util = { version = "0.3.8", optional = true }
+tokio = { version = "0.3.6", features = ["rt-multi-thread", "macros", "time", "io-util", "stream", "sync"], optional = true }
+
 
 [dev-dependencies]
 assert_matches = "1.4.0"

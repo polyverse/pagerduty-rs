@@ -1,4 +1,4 @@
-use pagerduty_rs::eventsv2::*;
+use pagerduty_rs::*;
 use rand::{thread_rng, Rng};
 use serde::Serialize;
 use time::OffsetDateTime;
