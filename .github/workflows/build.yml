@@ -1,0 +1,33 @@
+name: Build Status
+
+on:
+  # Build on all pushes
+  push:
+
+  # Build for any PRs.
+  pull_request:
+
+env:
+  BASE_COMMAND: rust-dev-envdocker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest
+
+jobs:
+  # Push image to GitHub Packages. No "testing" because this is a heavy image
+  # See also https://docs.docker.com/docker-hub/builds/
+  build:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Clippy sync
+        run: docker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest cargo clippy --all-targets
+
+      - name: Clippy async
+        run: docker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest cargo clippy --all-targets --features="async"
+
+      - name: Test sync
+        run: docker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest cargo test --all-targets
+
+      - name: Test async
+        run: docker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest cargo test --all-targets --features="async"

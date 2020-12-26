@@ -1,55 +1,46 @@
 use crate::private_types::*;
 use crate::types::*;
 
-use hyper::{client::HttpConnector, Body, Client, Request};
-use hyper_tls::HttpsConnector;
 use serde::Serialize;
 use std::convert::From;
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
-
-const CONTENT_TYPE: &str = "content-type";
-const USER_AGENT: &str = "user-agent";
-const CONTENT_ENCODING: &str = "content-encoding";
+use reqwest;
+use reqwest::header::{HeaderMap, HeaderValue, CONTENT_ENCODING, CONTENT_TYPE, USER_AGENT, InvalidHeaderValue};
 
 const CONTENT_ENCODING_IDENTITY: &str = "identity";
 const CONTENT_TYPE_JSON: &str = "application/json";
 
+
 #[derive(Debug)]
 pub enum EventsV2Error {
-    SerdeJsonError(serde_json::Error),
-    HyperError(hyper::Error),
-    HyperHttpError(hyper::http::Error),
+    ReqwestError(reqwest::Error),
+    InvalidHeaderValue(InvalidHeaderValue),
+
     //https://developer.pagerduty.com/docs/events-api-v2/overview/#api-response-codes--retry-logic
     HttpNotAccepted(u16), // NOT 4xx, 5xx or 200 (we expect 202). Contains HTTP response code.
-    HttpError(u16),       // A legit error (4xx or 5xx). Contains HTTP response code.
+    HttpError(u16) // A legit error (4xx or 5xx). Contains HTTP response code.
 }
 
 impl Error for EventsV2Error {}
 impl Display for EventsV2Error {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         match self {
-            Self::SerdeJsonError(e) => write!(f, "SerdeJsonError: {}", e),
-            Self::HyperHttpError(e) => write!(f, "HyperHttpError: {}", e),
-            Self::HyperError(e) => write!(f, "HyperError: {}", e),
+            Self::ReqwestError(e) => write!(f, "RequestError: {}", e),
+            Self::InvalidHeaderValue(e) => write!(f, "InvalidHeaderValue: {}", e),
             Self::HttpNotAccepted(e) => write!(f, "HttpNotAccepted: {}", e),
             Self::HttpError(e) => write!(f, "HttpError: {}", e),
         }
     }
 }
-impl From<serde_json::Error> for EventsV2Error {
-    fn from(err: serde_json::Error) -> Self {
-        Self::SerdeJsonError(err)
+impl From<reqwest::Error> for EventsV2Error {
+    fn from(err: reqwest::Error) -> Self {
+        Self::ReqwestError(err)
     }
 }
-impl From<hyper::http::Error> for EventsV2Error {
-    fn from(err: hyper::http::Error) -> Self {
-        Self::HyperHttpError(err)
-    }
-}
-impl From<hyper::Error> for EventsV2Error {
-    fn from(err: hyper::Error) -> Self {
-        Self::HyperError(err)
+impl From<InvalidHeaderValue> for EventsV2Error {
+    fn from(err: InvalidHeaderValue) -> Self {
+        Self::InvalidHeaderValue(err)
     }
 }
 
@@ -59,8 +50,7 @@ pub type EventsV2Result = Result<(), EventsV2Error>;
 pub struct EventsV2 {
     /// The integration/routing key for a generated PagerDuty service
     integration_key: String,
-    client: Client<HttpsConnector<HttpConnector>>,
-    user_agent: Option<String>,
+    client: reqwest::Client,
 }
 
 impl EventsV2 {
@@ -68,12 +58,21 @@ impl EventsV2 {
         integration_key: String,
         user_agent: Option<String>,
     ) -> Result<EventsV2, EventsV2Error> {
-        let https = HttpsConnector::new();
+
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_str(CONTENT_TYPE_JSON)?);
+        headers.insert(CONTENT_ENCODING, HeaderValue::from_str(CONTENT_ENCODING_IDENTITY)?);
+        if let Some(ua) = user_agent {
+            headers.insert(USER_AGENT, HeaderValue::from_str(ua.as_str())?);
+        }
+
+        let client = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
 
         Ok(EventsV2 {
             integration_key,
-            user_agent,
-            client: Client::builder().build::<_, hyper::Body>(https),
+            client,
         })
     }
 
@@ -81,9 +80,7 @@ impl EventsV2 {
         match event {
             Event::Change(c) => self.change(c).await,
             Event::AlertTrigger(at) => self.alert_trigger(at).await,
-            Event::AlertAcknowledge(aa) => {
-                self.alert_followup(aa.dedup_key, Action::Acknowledge).await
-            }
+            Event::AlertAcknowledge(aa) => self.alert_followup(aa.dedup_key, Action::Acknowledge).await,
             Event::AlertResolve(ar) => self.alert_followup(ar.dedup_key, Action::Resolve).await,
         }
     }
@@ -94,51 +91,33 @@ impl EventsV2 {
         self.do_post(
             "https://events.pagerduty.com/v2/change/enqueue",
             sendable_change,
-        )
-        .await
+        ).await
     }
 
     async fn alert_trigger<T: Serialize>(&self, alert_trigger: AlertTrigger<T>) -> EventsV2Result {
-        let sendable_alert_trigger =
-            SendableAlertTrigger::from_alert_trigger(alert_trigger, self.integration_key.clone());
+        let sendable_alert_trigger = SendableAlertTrigger::from_alert_trigger(alert_trigger, self.integration_key.clone());
 
         self.do_post(
             "https://events.pagerduty.com/v2/enqueue",
             sendable_alert_trigger,
-        )
-        .await
+        ).await
     }
 
     async fn alert_followup(&self, dedup_key: String, action: Action) -> EventsV2Result {
-        let sendable_alert_followup =
-            SendableAlertFollowup::new(dedup_key, action, self.integration_key.clone());
+        let sendable_alert_followup = SendableAlertFollowup::new(dedup_key, action, self.integration_key.clone());
 
         self.do_post(
             "https://events.pagerduty.com/v2/enqueue",
             sendable_alert_followup,
-        )
-        .await
+        ).await
     }
 
     // Make this part Async in the future
     async fn do_post<T: Serialize>(&self, url: &str, content: T) -> EventsV2Result {
-        let jsonstr = serde_json::to_string(&content)?;
-
-        let mut reqbldr = Request::builder()
-            .method("POST")
-            .uri(url)
-            .header(CONTENT_TYPE, CONTENT_TYPE_JSON)
-            .header(CONTENT_ENCODING, CONTENT_ENCODING_IDENTITY);
-
-        reqbldr = if let Some(ua) = &self.user_agent {
-            reqbldr.header(USER_AGENT, ua)
-        } else {
-            reqbldr
-        };
-
-        let req = reqbldr.body(Body::from(jsonstr))?;
-
-        let res = self.client.request(req).await?;
+        let res = self.client.post(url)
+            .json(&content)
+            .send()
+            .await?;
 
         match res.status().as_u16() {
             202 => Ok(()),
