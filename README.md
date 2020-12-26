@@ -1,4 +1,6 @@
 
+![Build Status](https://github.com/polyverse/pagerduty-rs/workflows/Build%20Status/badge.svg)
+
 # pagerduty-rs
 
 A PagerDuty Events V2 API Client Library in Rust.
