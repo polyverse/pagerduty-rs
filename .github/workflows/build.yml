@@ -7,27 +7,18 @@ on:
   # Build for any PRs.
   pull_request:
 
-env:
-  BASE_COMMAND: rust-dev-envdocker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest
-
 jobs:
   # Push image to GitHub Packages. No "testing" because this is a heavy image
   # See also https://docs.docker.com/docker-hub/builds/
   build:
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
-
+    strategy:
+      matrix:
+        operation: ["clippy", "test"]
+        featsync: ["", "async"]
     steps:
       - uses: actions/checkout@v2
 
-      - name: Clippy sync
-        run: docker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest cargo clippy --all
-
-      - name: Clippy async
-        run: docker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest cargo clippy --all --features="async"
-
-      - name: Test sync
-        run: docker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest cargo test --all
-
-      - name: Test async
-        run: docker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest cargo test --all --features="async"
+      - name: ${{matrix.operation}} ${{matrix.featsync}}
+        run: docker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest cargo ${{matrix.operation}} --all --features="${{matrix.featsync}}"
