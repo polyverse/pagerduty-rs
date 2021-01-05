@@ -1,16 +1,9 @@
 mod private_types;
-mod types;
 
-#[cfg(not(feature = "async"))]
-mod eventsv2sync;
+pub mod types;
 
-#[cfg(feature = "async")]
-mod eventsv2async;
-
-pub use types::*;
-
-#[cfg(not(feature = "async"))]
-pub use eventsv2sync::*;
+#[cfg(feature = "sync")]
+pub mod eventsv2sync;
 
 #[cfg(feature = "async")]
-pub use eventsv2async::*;
+pub mod eventsv2async;

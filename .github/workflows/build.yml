@@ -13,12 +13,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
-    strategy:
-      matrix:
-        operation: ["clippy", "test"]
-        featsync: ["", "async"]
     steps:
       - uses: actions/checkout@v2
 
-      - name: ${{matrix.operation}} ${{matrix.featsync}}
-        run: docker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest cargo ${{matrix.operation}} --all --features="${{matrix.featsync}}"
+      - name: Style (rustfmt)
+        run: docker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest cargo fmt --all -- --check
+
+      - name: Lint (Clippy)
+        run: docker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Build
+        run: docker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest cargo build-all-features --workspace
+
+      - name: Test
+        run: docker run -v cargo-cache:/root/.cargo/registry -v $PWD:/volume --rm -t ghcr.io/polyverse/rust-dev-env/rust-dev-env:latest cargo test-all-features --workspace

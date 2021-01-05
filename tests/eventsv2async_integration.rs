@@ -1,6 +1,7 @@
 #[cfg(feature = "async")]
 mod asynctest {
-    use pagerduty_rs::*;
+    use pagerduty_rs::eventsv2async::*;
+    use pagerduty_rs::types::*;
     use rand::{thread_rng, Rng};
     use serde::Serialize;
     use time::OffsetDateTime;
@@ -19,7 +20,7 @@ mod asynctest {
         if let Some(ik) = INTEGRATION_KEY {
             let e = Event::Change(Change {
                 payload: ChangePayload {
-                    summary: "Change Event 1 maximum fields".to_owned(),
+                    summary: "Asyncronously Change Event 1 maximum fields".to_owned(),
                     source: Some("hostname".to_owned()),
                     timestamp: OffsetDateTime::now_utc(),
                     custom_details: Some(SerializableTest {
@@ -47,7 +48,9 @@ mod asynctest {
             // With nothing optional
             let e = Event::Change(Change::<()> {
                 payload: ChangePayload {
-                    summary: "Change event 2 minimum fields (routing key in api client)".to_owned(),
+                    summary:
+                        "Asyncronously Change event 2 minimum fields (routing key in api client)"
+                            .to_owned(),
                     timestamp: OffsetDateTime::now_utc(),
                     source: None,
                     custom_details: None,
@@ -73,7 +76,7 @@ mod asynctest {
             // With everything
             let e = Event::AlertTrigger(AlertTrigger {
                 payload: AlertTriggerPayload {
-                    summary: "Test Alert 1 Maximum fields".to_owned(),
+                    summary: "Asyncronously Test Alert 1 Maximum fields".to_owned(),
                     source: "hostname".to_owned(),
                     timestamp: Some(OffsetDateTime::now_utc()),
                     severity: Severity::Info,
@@ -108,9 +111,6 @@ mod asynctest {
                 dedup_key: dedup_key.clone(),
             });
 
-            #[cfg(not(feature = "async"))]
-            let result = ev2.event(e);
-            #[cfg(feature = "async")]
             let result = ev2.event(e).await;
 
             assert!(result.is_ok());
@@ -133,7 +133,7 @@ mod asynctest {
             // With everything
             let e = Event::AlertTrigger::<()>(AlertTrigger {
                 payload: AlertTriggerPayload {
-                    summary: "Test Alert 1 Minimum fields".to_owned(),
+                    summary: "Asyncronously Test Alert 1 Minimum fields".to_owned(),
                     source: "hostname".to_owned(),
                     timestamp: None,
                     severity: Severity::Info,
