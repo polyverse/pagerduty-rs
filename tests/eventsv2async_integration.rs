@@ -7,7 +7,7 @@ mod asynctest {
     use time::OffsetDateTime;
 
     /// Set with some integration key value before running tests that post directly to service
-    const INTEGRATION_KEY: Option<&str> = Some("3b8dee0d3cbd494591efb3d6578f9760");
+    const INTEGRATION_KEY: Option<&str> = None;
 
     #[derive(Serialize)]
     pub struct SerializableTest {
