@@ -102,7 +102,6 @@ impl SendableAlertFollowup {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
-    use serde_json;
     use time::OffsetDateTime;
 
     #[derive(Serialize)]
