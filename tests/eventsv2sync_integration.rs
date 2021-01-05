@@ -1,12 +1,13 @@
-#[cfg(not(feature = "async"))]
+#[cfg(feature = "sync")]
 mod synctest {
-    use pagerduty_rs::*;
+    use pagerduty_rs::eventsv2sync::*;
+    use pagerduty_rs::types::*;
     use rand::{thread_rng, Rng};
     use serde::Serialize;
     use time::OffsetDateTime;
 
     /// Set with some integration key value before running tests that post directly to service
-    const INTEGRATION_KEY: Option<&str> = Some("3b8dee0d3cbd494591efb3d6578f9760");
+    const INTEGRATION_KEY: Option<&str> = None;
 
     #[derive(Serialize)]
     pub struct SerializableTest {
@@ -19,7 +20,7 @@ mod synctest {
         if let Some(ik) = INTEGRATION_KEY {
             let e = Event::Change(Change {
                 payload: ChangePayload {
-                    summary: "Change Event 1 maximum fields".to_owned(),
+                    summary: "Syncronously Change Event 1 maximum fields".to_owned(),
                     source: Some("hostname".to_owned()),
                     timestamp: OffsetDateTime::now_utc(),
                     custom_details: Some(SerializableTest {
@@ -47,7 +48,9 @@ mod synctest {
             // With nothing optional
             let e = Event::Change(Change::<()> {
                 payload: ChangePayload {
-                    summary: "Change event 2 minimum fields (routing key in api client)".to_owned(),
+                    summary:
+                        "Syncronously Change event 2 minimum fields (routing key in api client)"
+                            .to_owned(),
                     timestamp: OffsetDateTime::now_utc(),
                     source: None,
                     custom_details: None,
@@ -73,7 +76,7 @@ mod synctest {
             // With everything
             let e = Event::AlertTrigger(AlertTrigger {
                 payload: AlertTriggerPayload {
-                    summary: "Test Alert 1 Maximum fields".to_owned(),
+                    summary: "Syncronously Test Alert 1 Maximum fields".to_owned(),
                     source: "hostname".to_owned(),
                     timestamp: Some(OffsetDateTime::now_utc()),
                     severity: Severity::Info,
@@ -100,10 +103,7 @@ mod synctest {
                 client_url: Some("https://github.com/polyverse/zerotect".to_owned()),
             });
 
-            #[cfg(not(feature = "async"))]
             let result = ev2.event(e);
-            #[cfg(feature = "async")]
-            let result = tokio_test::block_on(ev2.event(e));
 
             assert!(result.is_ok());
 
@@ -133,7 +133,7 @@ mod synctest {
             // With everything
             let e = Event::AlertTrigger::<()>(AlertTrigger {
                 payload: AlertTriggerPayload {
-                    summary: "Test Alert 1 Minimum fields".to_owned(),
+                    summary: "Syncronously Test Alert 1 Minimum fields".to_owned(),
                     source: "hostname".to_owned(),
                     timestamp: None,
                     severity: Severity::Info,
