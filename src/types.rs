@@ -191,10 +191,32 @@ where
     }
 }
 
+// This suggestion
 fn datetime_to_iso8601<S>(d: &OffsetDateTime, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    //serializer.serialize_str(d.format(Format::Rfc3339).as_str())
-    serializer.serialize_str(d.format("%FT%T.%NZ").as_str())
+    serializer.serialize_str(d.format("%FT%H:%M:%S.%NZ").as_str())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use time::date;
+
+    #[test]
+    fn test_serialization_pads() {
+        let change = Change {
+            payload: ChangePayload::<()> {
+                summary: "Testing timestamp serialization".to_owned(),
+                timestamp: date!(2021-05-30).midnight().assume_utc(),
+                source: None,
+                custom_details: None,
+            },
+
+            links: None,
+        };
+
+        assert_eq!("{\"payload\":{\"summary\":\"Testing timestamp serialization\",\"timestamp\":\"2021-05-30T00:00:00.000000000Z\"}}", serde_json::to_string(&change).unwrap());
+    }
 }
