@@ -209,7 +209,7 @@ mod test {
         let change = Change {
             payload: ChangePayload::<()> {
                 summary: "Testing timestamp serialization".to_owned(),
-                timestamp: date!(2021-05-30).midnight().assume_utc(),
+                timestamp: date!(2021 - 05 - 30).midnight().assume_utc(),
                 source: None,
                 custom_details: None,
             },
