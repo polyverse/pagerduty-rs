@@ -38,7 +38,7 @@ mod asynctest {
 
             let result = ev2.event(e).await;
 
-            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), ());
         }
     }
 
@@ -62,7 +62,7 @@ mod asynctest {
 
             let result = ev2.event(e).await;
 
-            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), ());
         }
     }
 
@@ -105,7 +105,7 @@ mod asynctest {
 
             let result = ev2.event(e).await;
 
-            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), ());
 
             let e = Event::AlertAcknowledge::<()>(AlertAcknowledge {
                 dedup_key: dedup_key.clone(),
@@ -113,13 +113,13 @@ mod asynctest {
 
             let result = ev2.event(e).await;
 
-            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), ());
 
             let e = Event::AlertResolve::<()>(AlertResolve { dedup_key });
 
             let result = ev2.event(e).await;
 
-            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), ());
         }
     }
 
@@ -151,7 +151,7 @@ mod asynctest {
 
             let result = ev2.event(e).await;
 
-            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), ());
 
             let e = Event::AlertAcknowledge::<()>(AlertAcknowledge {
                 dedup_key: dedup_key.clone(),
@@ -159,13 +159,13 @@ mod asynctest {
 
             let result = ev2.event(e).await;
 
-            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), ());
 
             let e = Event::AlertResolve::<()>(AlertResolve { dedup_key });
 
             let result = ev2.event(e).await;
 
-            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), ());
         }
     }
 }

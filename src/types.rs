@@ -1,6 +1,5 @@
-use serde::Serialize;
-use serde::Serializer;
-use time::OffsetDateTime;
+use serde::{ser::Error as SerializeError, Serialize, Serializer};
+use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 /// Indicates the severity of the impact to the affected system.
 #[derive(Serialize)]
@@ -196,13 +195,16 @@ fn datetime_to_iso8601<S>(d: &OffsetDateTime, serializer: S) -> Result<S::Ok, S:
 where
     S: Serializer,
 {
-    serializer.serialize_str(d.format("%FT%H:%M:%S.%NZ").as_str())
+    match d.format(&Rfc3339) {
+        Ok(formatted) => serializer.serialize_str(formatted.as_str()),
+        Err(e) => Err(SerializeError::custom(format!("{}", e))),
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use time::date;
+    use time::macros::date;
 
     #[test]
     fn test_serialization_pads() {
@@ -217,6 +219,6 @@ mod test {
             links: None,
         };
 
-        assert_eq!("{\"payload\":{\"summary\":\"Testing timestamp serialization\",\"timestamp\":\"2021-05-30T00:00:00.000000000Z\"}}", serde_json::to_string(&change).unwrap());
+        assert_eq!("{\"payload\":{\"summary\":\"Testing timestamp serialization\",\"timestamp\":\"2021-05-30T00:00:00Z\"}}", serde_json::to_string(&change).unwrap());
     }
 }

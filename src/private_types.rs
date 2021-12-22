@@ -117,7 +117,7 @@ mod tests {
             payload: ChangePayload {
                 summary: "Hello".to_owned(),
                 source: Some("hostname".to_owned()),
-                timestamp: OffsetDateTime::from_unix_timestamp_nanos(2000071804323000000),
+                timestamp: OffsetDateTime::from_unix_timestamp_nanos(2000071804323000000).unwrap(),
                 custom_details: Some(SerializableTest {
                     some_field: "Serialize this!".to_owned(),
                     another_field: 34,
@@ -131,13 +131,13 @@ mod tests {
 
         let cr = serde_json::to_string(&c);
         assert!(cr.is_ok());
-        assert_eq!(cr.unwrap(), "{\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323000000Z\",\"source\":\"hostname\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}]}");
+        assert_eq!(cr.unwrap(), "{\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323Z\",\"source\":\"hostname\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}]}");
 
         // With nothing optional
         let c = Change::<()> {
             payload: ChangePayload {
                 summary: "Hello".to_owned(),
-                timestamp: OffsetDateTime::from_unix_timestamp_nanos(2000071804323000000),
+                timestamp: OffsetDateTime::from_unix_timestamp_nanos(2000071804323000000).unwrap(),
                 source: None,
                 custom_details: None,
             },
@@ -148,7 +148,7 @@ mod tests {
         assert!(cr.is_ok());
         assert_eq!(
             cr.unwrap(),
-            "{\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323000000Z\"}}"
+            "{\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323Z\"}}"
         );
     }
 
@@ -160,7 +160,7 @@ mod tests {
             payload: ChangePayload {
                 summary: "Hello".to_owned(),
                 source: Some("hostname".to_owned()),
-                timestamp: OffsetDateTime::from_unix_timestamp_nanos(2000071804323000000),
+                timestamp: OffsetDateTime::from_unix_timestamp_nanos(2000071804323000000).unwrap(),
                 custom_details: Some(SerializableTest {
                     some_field: "Serialize this!".to_owned(),
                     another_field: 34,
@@ -174,14 +174,14 @@ mod tests {
 
         let cr = serde_json::to_string(&c);
         assert!(cr.is_ok());
-        assert_eq!(cr.unwrap(), "{\"routing_key\":\"routingkey\",\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323000000Z\",\"source\":\"hostname\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}]}");
+        assert_eq!(cr.unwrap(), "{\"routing_key\":\"routingkey\",\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323Z\",\"source\":\"hostname\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}]}");
 
         // With nothing optional
         let c = SendableChange::<()> {
             routing_key: "routingkey".to_owned(),
             payload: ChangePayload {
                 summary: "Hello".to_owned(),
-                timestamp: OffsetDateTime::from_unix_timestamp_nanos(2000071804323000000),
+                timestamp: OffsetDateTime::from_unix_timestamp_nanos(2000071804323000000).unwrap(),
                 source: None,
                 custom_details: None,
             },
@@ -190,7 +190,7 @@ mod tests {
 
         let cr = serde_json::to_string(&c);
         assert!(cr.is_ok());
-        assert_eq!(cr.unwrap(), "{\"routing_key\":\"routingkey\",\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323000000Z\"}}");
+        assert_eq!(cr.unwrap(), "{\"routing_key\":\"routingkey\",\"payload\":{\"summary\":\"Hello\",\"timestamp\":\"2033-05-18T23:30:04.323Z\"}}");
     }
 
     #[test]
@@ -202,7 +202,7 @@ mod tests {
                 source: "hostname".to_owned(),
                 timestamp: Some(OffsetDateTime::from_unix_timestamp_nanos(
                     2000071804323000000,
-                )),
+                ).unwrap()),
                 severity: Severity::Info,
                 component: Some("postgres".to_owned()),
                 group: Some("prod-datapipe".to_owned()),
@@ -228,7 +228,7 @@ mod tests {
 
         let ar = serde_json::to_string(&a);
         assert!(ar.is_ok());
-        assert_eq!(ar.unwrap(), "{\"payload\":{\"severity\":\"info\",\"summary\":\"Hello\",\"source\":\"hostname\",\"timestamp\":\"2033-05-18T23:30:04.323000000Z\",\"component\":\"postgres\",\"group\":\"prod-datapipe\",\"class\":\"deploy\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"dedup_key\":\"dedupkey1\",\"images\":[{\"src\":\"https://polyverse.com/static/img/SplashPageIMG/polyverse_blue.png\",\"href\":\"https://polyverse.com\",\"alt\":\"The Polyverse Logo\"}],\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}],\"client\":\"Zerotect\",\"client_url\":\"https://github.com/polyverse/zerotect\"}");
+        assert_eq!(ar.unwrap(), "{\"payload\":{\"severity\":\"info\",\"summary\":\"Hello\",\"source\":\"hostname\",\"timestamp\":\"2033-05-18T23:30:04.323Z\",\"component\":\"postgres\",\"group\":\"prod-datapipe\",\"class\":\"deploy\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"dedup_key\":\"dedupkey1\",\"images\":[{\"src\":\"https://polyverse.com/static/img/SplashPageIMG/polyverse_blue.png\",\"href\":\"https://polyverse.com\",\"alt\":\"The Polyverse Logo\"}],\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}],\"client\":\"Zerotect\",\"client_url\":\"https://github.com/polyverse/zerotect\"}");
 
         // With nothing optional
         let a = AlertTrigger::<()> {
@@ -268,7 +268,7 @@ mod tests {
                 source: "hostname".to_owned(),
                 timestamp: Some(OffsetDateTime::from_unix_timestamp_nanos(
                     2000071804323000000,
-                )),
+                ).unwrap()),
                 severity: Severity::Info,
                 component: Some("postgres".to_owned()),
                 group: Some("prod-datapipe".to_owned()),
@@ -294,7 +294,7 @@ mod tests {
 
         let ar = serde_json::to_string(&a);
         assert!(ar.is_ok());
-        assert_eq!(ar.unwrap(), "{\"routing_key\":\"routingkey\",\"payload\":{\"severity\":\"info\",\"summary\":\"Hello\",\"source\":\"hostname\",\"timestamp\":\"2033-05-18T23:30:04.323000000Z\",\"component\":\"postgres\",\"group\":\"prod-datapipe\",\"class\":\"deploy\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"dedup_key\":\"dedupkey1\",\"images\":[{\"src\":\"https://polyverse.com/static/img/SplashPageIMG/polyverse_blue.png\",\"href\":\"https://polyverse.com\",\"alt\":\"The Polyverse Logo\"}],\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}],\"event_action\":\"trigger\",\"client\":\"Zerotect\",\"client_url\":\"https://github.com/polyverse/zerotect\"}");
+        assert_eq!(ar.unwrap(), "{\"routing_key\":\"routingkey\",\"payload\":{\"severity\":\"info\",\"summary\":\"Hello\",\"source\":\"hostname\",\"timestamp\":\"2033-05-18T23:30:04.323Z\",\"component\":\"postgres\",\"group\":\"prod-datapipe\",\"class\":\"deploy\",\"custom_details\":{\"some_field\":\"Serialize this!\",\"another_field\":34}},\"dedup_key\":\"dedupkey1\",\"images\":[{\"src\":\"https://polyverse.com/static/img/SplashPageIMG/polyverse_blue.png\",\"href\":\"https://polyverse.com\",\"alt\":\"The Polyverse Logo\"}],\"links\":[{\"href\":\"https://polyverse.com\",\"text\":\"Polyverse homepage\"}],\"event_action\":\"trigger\",\"client\":\"Zerotect\",\"client_url\":\"https://github.com/polyverse/zerotect\"}");
 
         // With nothing optional
         let a = SendableAlertTrigger::<()> {
