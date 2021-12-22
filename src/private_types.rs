@@ -200,9 +200,9 @@ mod tests {
             payload: AlertTriggerPayload {
                 summary: "Hello".to_owned(),
                 source: "hostname".to_owned(),
-                timestamp: Some(OffsetDateTime::from_unix_timestamp_nanos(
-                    2000071804323000000,
-                ).unwrap()),
+                timestamp: Some(
+                    OffsetDateTime::from_unix_timestamp_nanos(2000071804323000000).unwrap(),
+                ),
                 severity: Severity::Info,
                 component: Some("postgres".to_owned()),
                 group: Some("prod-datapipe".to_owned()),
@@ -266,9 +266,9 @@ mod tests {
             payload: AlertTriggerPayload {
                 summary: "Hello".to_owned(),
                 source: "hostname".to_owned(),
-                timestamp: Some(OffsetDateTime::from_unix_timestamp_nanos(
-                    2000071804323000000,
-                ).unwrap()),
+                timestamp: Some(
+                    OffsetDateTime::from_unix_timestamp_nanos(2000071804323000000).unwrap(),
+                ),
                 severity: Severity::Info,
                 component: Some("postgres".to_owned()),
                 group: Some("prod-datapipe".to_owned()),
